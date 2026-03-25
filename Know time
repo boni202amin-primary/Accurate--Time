@@ -1,0 +1,190 @@
+ <!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Prayer Time</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: 'Segoe UI';
+  background: linear-gradient(135deg,#141e30,#243b55);
+  color: white;
+  text-align: center;
+}
+
+.container { padding: 15px; }
+
+.top-bar { font-size: 13px; margin-bottom: 8px; opacity: 0.8; }
+
+.clock { font-size: 24px; font-weight: bold; }
+
+select {
+  padding: 5px;
+  border-radius: 5px;
+  margin: 10px;
+}
+
+.card {
+  margin: 8px auto;
+  padding: 12px;
+  max-width: 280px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.1);
+}
+
+.title { font-size: 14px; }
+
+.time { font-size: 18px; font-weight: bold; }
+
+.cd { font-size: 12px; opacity: 0.8; margin-top: 3px; }
+
+/* 🎨 Soft Colors */
+.sehri { border-left: 4px solid #00d9ff; }
+.fajr { border-left: 4px solid #4cffc3; }
+.dhuhr { border-left: 4px solid #ffd166; }
+.asr { border-left: 4px solid #fca311; }
+.iftar { border-left: 4px solid #ff6b6b; }
+.isha { border-left: 4px solid #c77dff; }
+
+button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #00c6ff;
+  color: black;
+}
+
+.status { font-size: 12px; margin-top: 5px; opacity: 0.7; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="top-bar" id="dates">Loading...</div>
+
+<div class="clock" id="clock">--:--:--</div>
+
+<select id="formatSelect">
+  <option value="24">24 Hour</option>
+  <option value="12">12 Hour</option>
+</select>
+
+<div class="card sehri">সেহরি <div id="sehri" class="time"></div><div id="cd_sehri" class="cd"></div></div>
+<div class="card fajr">ফজর <div id="fajr" class="time"></div><div id="cd_fajr" class="cd"></div></div>
+<div class="card dhuhr">যোহর <div id="dhuhr" class="time"></div><div id="cd_dhuhr" class="cd"></div></div>
+<div class="card asr">আসর <div id="asr" class="time"></div><div id="cd_asr" class="cd"></div></div>
+<div class="card iftar">ইফতার <div id="iftar" class="time"></div><div id="cd_iftar" class="cd"></div></div>
+<div class="card isha">ইশা <div id="isha" class="time"></div><div id="cd_isha" class="cd"></div></div>
+
+<button onclick="getLocation()">📍 লোকেশন</button>
+
+<div class="status" id="status">Ready</div>
+
+</div>
+
+<script>
+let timeFormat = "24";
+let rawTimes = {};
+
+// Clock
+setInterval(()=>{
+  let now=new Date();
+  document.getElementById("clock").innerText =
+    now.toLocaleTimeString("en-US",{hour12:timeFormat==="12"});
+},1000);
+
+// Format
+function formatTime(t){
+  let [h,m]=t.split(":");
+  let d=new Date();
+  d.setHours(h,m);
+  return d.toLocaleTimeString("en-US",{hour:'2-digit',minute:'2-digit',hour12:timeFormat==="12"});
+}
+
+// Update UI
+function updateTimes(){
+  document.getElementById("sehri").innerText=formatTime(rawTimes.Imsak||rawTimes.Fajr);
+  document.getElementById("fajr").innerText=formatTime(rawTimes.Fajr);
+  document.getElementById("dhuhr").innerText=formatTime(rawTimes.Dhuhr);
+  document.getElementById("asr").innerText=formatTime(rawTimes.Asr);
+  document.getElementById("iftar").innerText=formatTime(rawTimes.Maghrib);
+  document.getElementById("isha").innerText=formatTime(rawTimes.Isha);
+}
+
+// Format change
+document.getElementById("formatSelect").onchange=function(){
+  timeFormat=this.value;
+  updateTimes();
+};
+
+// Load API
+function loadTimes(lat,lon){
+  document.getElementById("status").innerText="⏳ লোড হচ্ছে...";
+
+  fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=2`)
+  .then(res=>res.json())
+  .then(data=>{
+    rawTimes=data.data.timings;
+
+    let d=data.data.date;
+    document.getElementById("dates").innerText =
+      `${d.gregorian.date} | ${d.hijri.date} | ${new Date().toLocaleDateString("bn-BD")}`;
+
+    updateTimes();
+    startCountdown();
+
+    document.getElementById("status").innerText="✅ আপডেট হয়েছে";
+  });
+}
+
+// ⏳ Multi Countdown
+function startCountdown(){
+  setInterval(()=>{
+    let now=new Date();
+
+    function calc(id,time){
+      let [h,m]=time.split(":");
+      let t=new Date();
+      t.setHours(h,m,0);
+
+      let diff=(t-now)/1000;
+
+      if(diff<=0){
+        document.getElementById(id).innerText="সময় হয়েছে";
+        return;
+      }
+
+      let hh=Math.floor(diff/3600);
+      let mm=Math.floor((diff%3600)/60);
+      let ss=Math.floor(diff%60);
+
+      document.getElementById(id).innerText =
+        `${hh}h ${mm}m ${ss}s বাকি`;
+    }
+
+    calc("cd_sehri",rawTimes.Imsak||rawTimes.Fajr);
+    calc("cd_fajr",rawTimes.Fajr);
+    calc("cd_dhuhr",rawTimes.Dhuhr);
+    calc("cd_asr",rawTimes.Asr);
+    calc("cd_iftar",rawTimes.Maghrib);
+    calc("cd_isha",rawTimes.Isha);
+
+  },1000);
+}
+
+// Location
+function getLocation(){
+  navigator.geolocation.getCurrentPosition(
+    pos=>loadTimes(pos.coords.latitude,pos.coords.longitude),
+    ()=>loadTimes(23.8103,90.4125)
+  );
+}
+</script>
+
+</body>
+</html>
